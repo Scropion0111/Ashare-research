@@ -1334,89 +1334,101 @@ def main():
     使用 Streamlit 原生 st.tabs() 导航
     - 信号清单：需要 Key 验证
     - 行情视图：需要 Key 验证
-    - 支持订阅：无需验证
+    - 支持订阅：始终开放
     """
     render_brand_header()
     render_disclaimer()
 
-    # ===== 原生 tabs 导航 =====
+    # ===== 自定义 tabs 样式 =====
+    st.markdown('''
+    <style>
+    /* Tabs 容器边框 */
+    div[data-testid="stTabs"] {
+        background: white;
+        border-radius: 12px;
+        padding: 16px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        margin-top: 16px;
+    }
+    /* Tab 选中样式 */
+    button[data-baseweb="tab"][aria-selected="true"] {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+        color: white !important;
+        border-radius: 8px 8px 0 0 !important;
+        font-weight: 600 !important;
+    }
+    /* Tab hover 效果 */
+    button[data-baseweb="tab"]:hover {
+        background: #f3f4f6 !important;
+        border-radius: 8px !important;
+    }
+    </style>
+    ''', unsafe_allow_html=True)
+
+    # ===== Tabs 导航 =====
     tab1, tab2, tab3 = st.tabs(["📊 信号清单", "📈 行情视图", "☕ 支持订阅"])
 
-    # ===== Tab 1: 信号清单 =====
+    # ===== Tab 1: 信号清单（需验证） =====
     with tab1:
-        # 先尝试获取已验证的 Key
         access_key = st.session_state.get('verified_key', None)
         key_mask = st.session_state.get('verified_key_mask', None)
         
         if not access_key:
-            # 未验证，显示输入框
+            # 未验证 - 显示输入框
             access_key, key_mask = render_access_input()
             
             if access_key:
-                # 验证成功，保存状态
                 st.session_state.verified_key = access_key
                 st.session_state.verified_key_mask = key_mask
                 st.success("✅ 验证成功！")
+                st.rerun()
             else:
-                # 未验证，显示锁定状态
+                # 未验证状态
                 render_lock_screen()
                 render_trial_chart()
                 render_watermark(mode="trial")
-                st.markdown("""
-                <div style="text-align:center; padding:16px 0 24px;">
-                    <strong style="color:#f59e0b;">请切换至「支持订阅」获取 Access Key</strong>
-                </div>
-                """, unsafe_allow_html=True)
+                st.info("💡 请先切换到「☕ 支持订阅」获取 Access Key")
                 st.stop()
         
-        # 验证通过，显示信号列表
+        # 验证通过
         page_signal_list(key_mask)
 
-    # ===== Tab 2: 行情视图 =====
+    # ===== Tab 2: 行情视图（需验证） =====
     with tab2:
         access_key = st.session_state.get('verified_key', None)
         
         if not access_key:
-            # 未验证，显示锁定状态
-            st.markdown("""
-            <div class="locked-prompt">
-                <div class="locked-prompt-icon">🔒</div>
-                <div class="locked-prompt-title">行情视图需订阅后解锁</div>
-                <div class="locked-prompt-text">请输入 Access Key 验证身份</div>
+            # 未验证 - 显示引导卡片
+            st.markdown('''
+            <div style="
+                background: linear-gradient(135deg, #f5f7fa 0%, #e4e8eb 100%);
+                border-radius: 16px;
+                padding: 48px 24px;
+                text-align: center;
+                margin: 24px 0;
+            ">
+                <div style="font-size: 64px; margin-bottom: 16px;">🔒</div>
+                <h3 style="color: #374151; margin-bottom: 12px;">行情视图需解锁后查看</h3>
+                <p style="color: #6b7280; margin-bottom: 24px;">
+                    请先获取 Access Key，解锁后可查看 TradingView 行情图表
+                </p>
             </div>
-            """, unsafe_allow_html=True)
+            ''', unsafe_allow_html=True)
             
-            # 输入框
-            col1, col2 = st.columns([3, 1])
+            # 快捷按钮
+            col1, col2 = st.columns([1, 1])
             with col1:
-                chart_key = st.text_input(
-                    "Access Key", type="password", placeholder="EF-26Q1-XXXXXXXX",
-                    label_visibility="collapsed", key="chart_key_input"
-                )
+                st.info("📋 请切换到「☕ 支持订阅」查看订阅说明和获取 Key")
             with col2:
-                if st.button("解锁", use_container_width=True, type="primary"):
-                    result = validate_access_key(chart_key)
-                    if result['valid']:
-                        st.session_state.verified_key = chart_key
-                        st.session_state.verified_key_mask = result['key']
-                        st.success("✅ 验证成功！")
-                        st.rerun()
-                    else:
-                        st.error("❌ 无效的 Access Key")
-            
-            # 快捷入口
-            if st.button("→ 获取 Access Key", type="secondary", use_container_width=True):
-                # 切换到 Tab 3 - 但 tabs 不支持直接切换
-                # 用户需要手动点击
-                st.info("请点击上方的「☕ 支持订阅」获取 Access Key")
+                pass
             
             render_watermark(mode="trial")
             st.stop()
         
-        # 已验证，显示行情图表
+        # 已验证
         page_chart(key_verified=True)
 
-    # ===== Tab 3: 支持订阅 =====
+    # ===== Tab 3: 支持订阅（始终开放） =====
     with tab3:
         render_support_page()
 
