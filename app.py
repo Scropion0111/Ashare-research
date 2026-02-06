@@ -1331,29 +1331,21 @@ def main():
     """
     【主入口】
     
-    横向导航栏（一行）+ Tab 切换
-    - 信号清单：需要 Key 验证
-    - 行情视图：需要 Key 验证  
-    - 支持订阅：始终开放（无需验证）
+    工程架构：
+    - HTML 负责"点"：<a href="?tab=xxx">
+    - Streamlit 只负责"读 URL"：st.query_params.get("tab")
+    - 绝对不渲染任何导航组件（st.radio/st.tabs/st.button）
     """
     render_brand_header()
     render_disclaimer()
 
-    # ===== 状态管理 =====
-    if 'nav_page' not in st.session_state:
-        st.session_state.nav_page = 'support'  # 默认显示支持订阅
+    # ===== 只读 URL，不做任何导航组件 =====
+    tab = st.query_params.get("tab", "support")
 
-    # 获取当前页面
-    current_page = st.session_state.nav_page
-
-    # ===== 横向导航栏（使用隐藏 radio 控制）=====
+    # ===== HTML 横向导航（纯 a 标签）=====
     st.markdown('''
     <style>
-    /* 隐藏原生 radio */
-    .nav-radio { display: none !important; }
-    
-    /* 横向导航容器 */
-    .nav-bar {
+    .nav-container {
         display: flex;
         gap: 0;
         background: white;
@@ -1363,106 +1355,95 @@ def main():
         margin: 16px 0;
     }
     
-    /* 导航项 */
-    .nav-item {
+    .nav-link {
         flex: 1;
         text-align: center;
-        padding: 16px 8px;
+        padding: 16px 12px;
         border-radius: 10px;
-        cursor: pointer;
+        text-decoration: none !important;
+        color: #6b7280;
+        font-weight: 500;
+        font-size: 14px;
         transition: all 0.3s;
         border: 2px solid transparent;
-        color: #6b7280;
     }
     
-    .nav-item:hover {
+    .nav-link:hover {
         background: #f3f4f6;
+        color: #374151;
     }
     
-    /* 选中状态 */
-    .nav-item.active {
+    .nav-link.active {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        border-color: transparent;
+        color: white !important;
     }
     
-    /* 锁定状态 */
-    .nav-item.locked {
-        color: #9ca3af;
+    .nav-icon {
+        font-size: 20px;
+        display: block;
+        margin-bottom: 4px;
     }
-    
-    .nav-icon { font-size: 20px; margin-bottom: 4px; }
-    .nav-label { font-size: 14px; font-weight: 500; }
     </style>
+    
+    <div class="nav-container">
+        <a href="?tab=signal" class="nav-link ''' + ('active' if tab == 'signal' else '') + '''">
+            <span class="nav-icon">📊</span>
+            信号清单
+        </a>
+        <a href="?tab=chart" class="nav-link ''' + ('active' if tab == 'chart' else '') + '''">
+            <span class="nav-icon">📈</span>
+            行情视图
+        </a>
+        <a href="?tab=support" class="nav-link ''' + ('active' if tab == 'support' else '') + '''">
+            <span class="nav-icon">☕</span>
+            支持订阅
+        </a>
+    </div>
     ''', unsafe_allow_html=True)
 
-    # 渲染导航 HTML（横向一行）
-    st.markdown('''
-    <div class="nav-bar">
-        <label class="nav-item" for="nav_signal">
-            <div class="nav-icon">📊</div>
-            <div class="nav-label">信号清单</div>
-        </label>
-        <label class="nav-item" for="nav_chart">
-            <div class="nav-icon">📈</div>
-            <div class="nav-label">行情视图</div>
-        </label>
-        <label class="nav-item active" for="nav_support">
-            <div class="nav-icon">☕</div>
-            <div class="nav-label">支持订阅</div>
-        </label>
-    </div>
+    # ===== 根据 URL 参数渲染页面（只渲染内容，不渲染导航）=====
     
-    <!-- 隐藏的 radio 按钮 -->
-    <div class="nav-radio">
-''', unsafe_allow_html=True)
-
-    # 使用 radio 选择当前页面
-    selected = st.radio(
-        "",
-        options=["signal", "chart", "support"],
-        index=["signal", "chart", "support"].index(current_page) if current_page in ["signal", "chart", "support"] else 2,
-        key="nav_radio",
-        label_visibility="collapsed"
-    )
-
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    # ===== 根据选择更新页面 =====
-    st.session_state.nav_page = selected
-
-    # ===== 渲染对应内容 =====
-    if selected == 'signal':
-        # --- 信号清单 ---
+    if tab == "signal":
+        # ===== 信号清单 =====
         access_key = st.session_state.get('verified_key', None)
         key_mask = st.session_state.get('verified_key_mask', None)
         
         if access_key:
             page_signal_list(key_mask)
         else:
+            # 无 Key，必须显示 Access Key 输入框
             st.markdown('''
             <div style="
                 background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
                 border-radius: 16px;
-                padding: 40px;
+                padding: 32px;
                 text-align: center;
                 border: 2px solid #f59e0b;
+                margin-bottom: 24px;
             ">
-                <div style="font-size: 56px; margin-bottom: 16px;">🔒</div>
-                <h2 style="color: #92400e; margin-bottom: 12px;">信号清单已锁定</h2>
-                <p style="color: #b45309; font-size: 16px;">
-                    请先获取 Access Key 验证身份
-                </p>
-                <div style="margin-top: 20px;">
-                    <strong style="color: #92400e;">请切换到「☕ 支持订阅」获取 Key</strong>
-                </div>
+                <div style="font-size: 48px; margin-bottom: 12px;">🔒</div>
+                <h3 style="color: #92400e; margin-bottom: 8px;">请输入 Access Key 解锁信号清单</h3>
+                <p style="color: #b45309;">在下方输入框中输入您的订阅密钥</p>
             </div>
             ''', unsafe_allow_html=True)
+            
+            # 显示 Key 输入框
+            access_key, key_mask = render_access_input()
+            
+            if access_key:
+                st.session_state.verified_key = access_key
+                st.session_state.verified_key_mask = key_mask
+                st.success("✅ 验证成功！")
+                st.rerun()
+            
+            # 提示引导
+            st.info("💡 没有 Key？请切换到「☕ 支持订阅」页面获取")
+            
             render_trial_chart()
             render_watermark(mode="trial")
 
-    elif selected == 'chart':
-        # --- 行情视图 ---
+    elif tab == "chart":
+        # ===== 行情视图 =====
         access_key = st.session_state.get('verified_key', None)
         
         if access_key:
@@ -1472,24 +1453,42 @@ def main():
             <div style="
                 background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
                 border-radius: 16px;
-                padding: 40px;
+                padding: 32px;
                 text-align: center;
                 border: 2px solid #ef4444;
+                margin-bottom: 24px;
             ">
-                <div style="font-size: 56px; margin-bottom: 16px;">🔒</div>
-                <h2 style="color: #b91c1c; margin-bottom: 12px;">行情视图已锁定</h2>
-                <p style="color: #dc2626; font-size: 16px;">
-                    请先获取 Access Key 验证身份
-                </p>
-                <div style="margin-top: 20px;">
-                    <strong style="color: #b91c1c;">请切换到「☕ 支持订阅」获取 Key</strong>
-                </div>
+                <div style="font-size: 48px; margin-bottom: 12px;">🔒</div>
+                <h3 style="color: #b91c1c; margin-bottom: 8px;">行情视图需解锁后查看</h3>
+                <p style="color: #dc2626;">请先获取 Access Key</p>
             </div>
             ''', unsafe_allow_html=True)
+            
+            # 显示 Key 输入框
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                chart_key = st.text_input(
+                    "Access Key", type="password", placeholder="EF-26Q1-XXXXXXXX",
+                    label_visibility="collapsed", key="chart_key_input"
+                )
+            with col2:
+                if st.button("解锁", use_container_width=True, type="primary"):
+                    result = validate_access_key(chart_key)
+                    if result['valid']:
+                        st.session_state.verified_key = chart_key
+                        st.session_state.verified_key_mask = result['key']
+                        st.success("✅ 验证成功！")
+                        st.rerun()
+                    else:
+                        st.error("❌ 无效的 Access Key")
+            
+            # 引导
+            st.info("💡 没有 Key？请切换到「☕ 支持订阅」页面获取")
+            
             render_watermark(mode="trial")
 
-    else:  # support
-        # --- 支持订阅（始终开放）---
+    else:  # tab == "support"
+        # ===== 支持订阅（始终开放）=====
         render_support_page()
 
 
