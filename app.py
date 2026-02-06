@@ -1331,144 +1331,165 @@ def main():
     """
     【主入口】
     
-    使用 Streamlit 原生 st.tabs() 导航
+    横向导航栏（一行）+ Tab 切换
     - 信号清单：需要 Key 验证
-    - 行情视图：需要 Key 验证
-    - 支持订阅：始终开放
+    - 行情视图：需要 Key 验证  
+    - 支持订阅：始终开放（无需验证）
     """
     render_brand_header()
     render_disclaimer()
 
-    # ===== 自定义 tabs 样式 =====
+    # ===== 状态管理 =====
+    if 'nav_page' not in st.session_state:
+        st.session_state.nav_page = 'support'  # 默认显示支持订阅
+
+    # 获取当前页面
+    current_page = st.session_state.nav_page
+
+    # ===== 横向导航栏（使用隐藏 radio 控制）=====
     st.markdown('''
     <style>
-    /* Tabs 容器边框 */
-    div[data-testid="stTabs"] {
+    /* 隐藏原生 radio */
+    .nav-radio { display: none !important; }
+    
+    /* 横向导航容器 */
+    .nav-bar {
+        display: flex;
+        gap: 0;
         background: white;
         border-radius: 12px;
-        padding: 16px;
+        padding: 8px;
         box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-        margin-top: 16px;
+        margin: 16px 0;
     }
-    /* Tab 选中样式 */
-    button[data-baseweb="tab"][aria-selected="true"] {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-        color: white !important;
-        border-radius: 8px 8px 0 0 !important;
-        font-weight: 600 !important;
+    
+    /* 导航项 */
+    .nav-item {
+        flex: 1;
+        text-align: center;
+        padding: 16px 8px;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: all 0.3s;
+        border: 2px solid transparent;
+        color: #6b7280;
     }
-    /* Tab hover 效果 */
-    button[data-baseweb="tab"]:hover {
-        background: #f3f4f6 !important;
-        border-radius: 8px !important;
+    
+    .nav-item:hover {
+        background: #f3f4f6;
     }
+    
+    /* 选中状态 */
+    .nav-item.active {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-color: transparent;
+    }
+    
+    /* 锁定状态 */
+    .nav-item.locked {
+        color: #9ca3af;
+    }
+    
+    .nav-icon { font-size: 20px; margin-bottom: 4px; }
+    .nav-label { font-size: 14px; font-weight: 500; }
     </style>
     ''', unsafe_allow_html=True)
 
-    # ===== Tabs 导航 =====
-    tab1, tab2, tab3 = st.tabs(["📊 信号清单", "📈 行情视图", "☕ 支持订阅"])
+    # 渲染导航 HTML（横向一行）
+    st.markdown('''
+    <div class="nav-bar">
+        <label class="nav-item" for="nav_signal">
+            <div class="nav-icon">📊</div>
+            <div class="nav-label">信号清单</div>
+        </label>
+        <label class="nav-item" for="nav_chart">
+            <div class="nav-icon">📈</div>
+            <div class="nav-label">行情视图</div>
+        </label>
+        <label class="nav-item active" for="nav_support">
+            <div class="nav-icon">☕</div>
+            <div class="nav-label">支持订阅</div>
+        </label>
+    </div>
+    
+    <!-- 隐藏的 radio 按钮 -->
+    <div class="nav-radio">
+''', unsafe_allow_html=True)
 
-    # ===== Tab 1: 信号清单（需验证） =====
-    with tab1:
+    # 使用 radio 选择当前页面
+    selected = st.radio(
+        "",
+        options=["signal", "chart", "support"],
+        index=["signal", "chart", "support"].index(current_page) if current_page in ["signal", "chart", "support"] else 2,
+        key="nav_radio",
+        label_visibility="collapsed"
+    )
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # ===== 根据选择更新页面 =====
+    st.session_state.nav_page = selected
+
+    # ===== 渲染对应内容 =====
+    if selected == 'signal':
+        # --- 信号清单 ---
         access_key = st.session_state.get('verified_key', None)
         key_mask = st.session_state.get('verified_key_mask', None)
         
-        if not access_key:
-            # 未验证 - 显示输入框
-            access_key, key_mask = render_access_input()
-            
-            if access_key:
-                st.session_state.verified_key = access_key
-                st.session_state.verified_key_mask = key_mask
-                st.success("✅ 验证成功！")
-                st.rerun()
-            else:
-                # 未验证状态
-                render_lock_screen()
-                render_trial_chart()
-                render_watermark(mode="trial")
-                st.info("💡 请先切换到「☕ 支持订阅」获取 Access Key")
-                st.stop()
-        
-        # 验证通过
-        page_signal_list(key_mask)
+        if access_key:
+            page_signal_list(key_mask)
+        else:
+            st.markdown('''
+            <div style="
+                background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+                border-radius: 16px;
+                padding: 40px;
+                text-align: center;
+                border: 2px solid #f59e0b;
+            ">
+                <div style="font-size: 56px; margin-bottom: 16px;">🔒</div>
+                <h2 style="color: #92400e; margin-bottom: 12px;">信号清单已锁定</h2>
+                <p style="color: #b45309; font-size: 16px;">
+                    请先获取 Access Key 验证身份
+                </p>
+                <div style="margin-top: 20px;">
+                    <strong style="color: #92400e;">请切换到「☕ 支持订阅」获取 Key</strong>
+                </div>
+            </div>
+            ''', unsafe_allow_html=True)
+            render_trial_chart()
+            render_watermark(mode="trial")
 
-    # ===== Tab 2: 行情视图（需验证） =====
-    with tab2:
+    elif selected == 'chart':
+        # --- 行情视图 ---
         access_key = st.session_state.get('verified_key', None)
         
-        if not access_key:
-            # 未验证 - 显示可点击的引导卡片
+        if access_key:
+            page_chart(key_verified=True)
+        else:
             st.markdown('''
-            <style>
-            .clickable-card {
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            <div style="
+                background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
                 border-radius: 16px;
-                padding: 40px 32px;
+                padding: 40px;
                 text-align: center;
-                margin: 24px 0;
-                cursor: pointer;
-                transition: all 0.3s ease;
-                box-shadow: 0 8px 24px rgba(102, 126, 234, 0.3);
-            }
-            .clickable-card:hover {
-                transform: translateY(-4px);
-                box-shadow: 0 12px 32px rgba(102, 126, 234, 0.4);
-            }
-            .clickable-card:active {
-                transform: translateY(-2px);
-            }
-            .clickable-icon {
-                font-size: 72px;
-                margin-bottom: 16px;
-            }
-            .clickable-title {
-                color: white;
-                font-size: 1.5em;
-                font-weight: 700;
-                margin-bottom: 12px;
-            }
-            .clickable-text {
-                color: rgba(255, 255, 255, 0.9);
-                font-size: 1.1em;
-                margin-bottom: 8px;
-            }
-            .clickable-btn {
-                display: inline-block;
-                background: white;
-                color: #667eea;
-                padding: 12px 32px;
-                border-radius: 30px;
-                font-weight: 600;
-                margin-top: 16px;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            }
-            </style>
-            
-            <div class="clickable-card" onclick="document.querySelector('[data-testid=\\'stTab\\'][tabindex=\\'2\\']').click()">
-                <div class="clickable-icon">☕</div>
-                <div class="clickable-title">获取 Access Key</div>
-                <div class="clickable-text">点击此处切换到「支持订阅」页面</div>
-                <div class="clickable-text">查看订阅说明并获取解锁密钥</div>
-                <div class="clickable-btn">→ 去获取 Key</div>
+                border: 2px solid #ef4444;
+            ">
+                <div style="font-size: 56px; margin-bottom: 16px;">🔒</div>
+                <h2 style="color: #b91c1c; margin-bottom: 12px;">行情视图已锁定</h2>
+                <p style="color: #dc2626; font-size: 16px;">
+                    请先获取 Access Key 验证身份
+                </p>
+                <div style="margin-top: 20px;">
+                    <strong style="color: #b91c1c;">请切换到「☕ 支持订阅」获取 Key</strong>
+                </div>
             </div>
-            
-            <script>
-            // 确保点击引导到支持订阅tab
-            document.querySelectorAll('[data-testid="stTab"]')[2].addEventListener('click', function() {
-                window.location.hash = 'support';
-            });
-            </script>
             ''', unsafe_allow_html=True)
-            
             render_watermark(mode="trial")
-            st.stop()
-        
-        # 已验证
-        page_chart(key_verified=True)
 
-    # ===== Tab 3: 支持订阅（始终开放） =====
-    with tab3:
+    else:  # support
+        # --- 支持订阅（始终开放）---
         render_support_page()
 
 
